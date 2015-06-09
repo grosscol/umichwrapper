@@ -52,7 +52,7 @@ UMichwrapper starts by looking for config/umich.yml in your project.  Failing th
  * Additions to your project's gemfile:
 ```
 # Primary Hydra Dependency
-gem 'hydra', '9.0.0'
+gem 'hydra', '~> 9.0'
 
 # UMichwrapper
 gem 'umichwrapper', github: 'mlibrary/umichwrapper', branch: 'master'
