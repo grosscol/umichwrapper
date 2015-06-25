@@ -7,8 +7,8 @@ namespace :umich do
     UMichwrapper.clean(UMICH_CONFIG)
   end
 
-  directory "dist"
-  directory "config"
+  # directory "dist"
+  # directory "config"
 
   desc "Load the umich environment from config."
   task :environment do
@@ -20,6 +20,16 @@ namespace :umich do
   desc "Setup solr core and fedora node."
   task :setup => :environment do
     UMichwrapper.setup(UMICH_CONFIG)
+  end
+
+  desc "Setup solr core only."
+  task :solr => :environment do
+    UMichwrapper.solr_only(UMICH_CONFIG)
+  end
+
+  desc "Setup fedora node only."
+  task :fedora => :environment do
+    UMichwrapper.fedora_only(UMICH_CONFIG)
   end
 
   desc "Print the app status and environment config."

@@ -105,8 +105,8 @@ class UMichwrapper
       logger.info "Load config.  @env = #{@env}."
       default_file = File.expand_path("../config/umich.yml", File.dirname(__FILE__))
       app_file     = "#{app_root}/config/umich.yml"
-      fedora_file  = "#{app_root}/config/solr.yml"
-      solr_file    = "#{app_root}/config/fedora.yml"
+      fedora_file  = "#{app_root}/config/fedora.yml"
+      solr_file    = "#{app_root}/config/solr.yml"
 
       umich_file   = "#{app_root}/config/umich.yml"
 
@@ -126,8 +126,13 @@ class UMichwrapper
         end
       end
 
-      # Merge hashes overwritting with app_config where applicable 
+      # Merge default and app umich configs
+      #  overwritting with app_config where applicable 
       sum_config.merge! app_config, &merge_logic
+
+      # Add fedora and solr configs from matching config_name
+      sum_config[config_name]['solr_cfg']   = solr_config[config_name]
+      sum_config[config_name]['fedora_cfg'] = fedora_config[config_name]
 
       # Add the indifferent access magic from ActiveSupport.
       config = sum_config.with_indifferent_access
@@ -136,6 +141,7 @@ class UMichwrapper
 
 
     # Set the parameters for the instance.
+    # Parameters are loaded in precendence solr|fedora > umich > default
     # @note tupac represents the one and only wrapper instance.
     #
     # @return instance
@@ -147,33 +153,34 @@ class UMichwrapper
     #   :fedora_host
     #   :fedora_port
     #
-    #   :fedora_url the user specific url which will have test|dev appended.
-    #   :solr_admin_url   the user specific url which will have test|dev appended.
     def configure(params)
       params ||= {}
       tupac = self.instance
 
-      # Params for Solr
-      tupac.solr_admin_url = params[:solr_admin_url] || "localhost:8080/tomcat/quod-dev/solr-hydra"
-      tupac.solr_admin_url   = "#{tupac.solr_admin_url}/admin" 
-      tupac.solr_home = params[:solr_home] || "/quod-dev/idx/h/hydra-solr"
+      # Params Required for Solr
+      tupac.solr_admin_url   = params[:solr_admin_url] || "localhost:8080/tomcat/quod-dev/solr-hydra/admin"
+      tupac.solr_home        = params[:solr_home] || "/quod-dev/idx/h/hydra-solr"
 
-      # Params for Fedora
-      tupac.fedora_url = params[:fedora_url] || "localhost:8080/tomcat/quod-dev/fedora"
-      tupac.fedora_rest_url   = "#{tupac.fedora_url}/rest" 
+      # Params Required for Fedora
+      tupac.fedora_url       = params[:fedora_cfg][:url] || params[:fedora_url] || "localhost:8080/tomcat/quod-dev/fedora/rest"
+      tupac.fedora_rest_url  = "#{tupac.fedora_url}" 
 
       # Params without required defaults.
-      tupac.solr_core_name = params[:solr_core_name]
-      tupac.fedora_node_path = params[:fedora_node_path]
+      tupac.solr_core_name   = params[:solr_core_name]
+      tupac.fedora_node_path = params[:fedora_cfg][:base_path] || params[:fedora_node_path]
       
       return tupac
     end
 
     def print_status(params = {})
       tupac = configure( params )
-      puts "solr_admin_url: #{tupac.solr_admin_url}"
-      puts "solr running:   #{tupac.solr_running?|| 'false'}"
-      puts "fedora_url:     #{tupac.fedora_url}"
+      puts "-- Application --"
+      puts "solr_core_name:   #{tupac.solr_core_name}"
+      puts "fedora_base_node: #{tupac.fedora_node_path}"
+      puts "-- Service --"
+      puts "solr_admin_url:   #{tupac.solr_admin_url}"
+      puts "solr running:     #{tupac.solr_running? || 'false'}"
+      puts "fedora_url:       #{tupac.fedora_url}"
 
       puts "-- Solr Cores   --"
       tupac.core_status.each{|core, info| puts "#{info["instanceDir"]} :: #{core}"}
@@ -185,6 +192,18 @@ class UMichwrapper
     def setup(params)
       UMichwrapper.configure(params)
       UMichwrapper.instance.add_core
+      UMichwrapper.instance.add_node
+      return UMichwrapper.instance
+    end
+
+    def solr_only(params)
+      UMichwrapper.configure(params)
+      UMichwrapper.instance.add_core
+      return UMichwrapper.instance
+    end
+
+    def fedora_only(params)
+      UMichwrapper.configure(params)
       UMichwrapper.instance.add_node
       return UMichwrapper.instance
     end
@@ -228,11 +247,10 @@ class UMichwrapper
   end
 
   def del_core
-    cname = "#{ENV['USER']}-#{corename}"
     # API call to unload core with Solr instance.
     vars = {
       action: "UNLOAD",
-      core: cname,
+      core: corename,
       wt: "json"}
 
     target_url = "#{self.solr_admin_url}/cores"
@@ -242,25 +260,25 @@ class UMichwrapper
     if body["error"]
       logger.warn body["error"]
     else
-      logger.info "Core [#{cname}] unloaded."
+      logger.info "Core [#{corename}] unloaded."
     end
 
     # Remove core directory from file system
-    core_inst_dir = File.join( self.solr_home, ENV['USER'], cname )
+    core_inst_dir = File.join( self.solr_home, ENV['USER'], corename )
     logger.info "Deleting dir: #{core_inst_dir}"
 
     FileUtils.rm_rf( core_inst_dir )
   end
 
   def corename
-    name = self.solr_core_name || env_fullname( UMichwrapper.env )
+    name = self.solr_core_name || "#{ENV['USER']}-#{env_name(UMichwrapper.env)}"
   end
 
   def nodename
-    name = self.fedora_node_path || env_fullname( UMichwrapper.env )
+    name = self.fedora_node_path || "#{ENV['USER']}-#{env_name(UMichwrapper.env)}"
   end
 
-  def env_fullname( env )
+  def env_name( env )
     case env
     when /^dev(elopment)?/i
       "dev"
@@ -273,17 +291,16 @@ class UMichwrapper
 
   def add_core
     # Get core instance dir for user/project
-    cname = "#{ENV['USER']}-#{corename}"
-    core_inst_dir = File.join( self.solr_home, ENV['USER'], cname )
+    core_inst_dir = File.join( self.solr_home, ENV['USER'], corename )
 
-    logger.debug "Adding solr core #{cname}"
-    # Check if core already exists
+    logger.debug "Adding solr core #{corename}"
+    # Check if core instance directory already exists
     cs = core_status
     instance_dirs =  cs.collect{ |arr| arr[1]["instanceDir"].chop }
 
-    # Short circut if core already exists in Solr instance.
+    # Short circut if core instance directory already exists.
     if instance_dirs.include? core_inst_dir
-      logger.info "Core #{cname} alerady exists."
+      logger.info "Directory for #{corename} alerady exists."
       return
     end
 
@@ -299,7 +316,8 @@ class UMichwrapper
     end
     
     # Create core_inst_dir directory parent on the file system.
-    FileUtils.mkdir_p( File.expand_path("..", core_inst_dir) )
+    core_inst_dir_parent = File.expand_path("..", core_inst_dir) 
+    FileUtils.mkdir_p( core_inst_dir_parent )
 
     # Copy contents of template source to core instance directory
     FileUtils.cp_r(src, core_inst_dir, remove_destination: true)
@@ -310,7 +328,7 @@ class UMichwrapper
     # Sometimes core discovery is flakey, so ignore an error response here.
     vars = {
       action: "CREATE",
-      name: cname,
+      name: corename,
       instanceDir: core_inst_dir,
       wt: "json"}
 
@@ -321,7 +339,7 @@ class UMichwrapper
     if body["error"]
       logger.warn body["error"]
     else
-      logger.info "Core [#{cname}] added."
+      logger.info "Core [#{corename}] added."
     end
   end
 
@@ -333,42 +351,39 @@ class UMichwrapper
 
   # Add fedora container node
   def add_node
-    nname ="#{nodename}" 
     heads = { 'Content-Type' => "text/turtle" }
-    bodyrdf = "PREFIX dc: <http://purl.org/dc/elements/1.1/> <> dc:title \"#{nname}-root\""
-    target_url = "#{self.fedora_rest_url}/#{ENV["USER"]}/#{nname}"
+    bodyrdf = "PREFIX dc: <http://purl.org/dc/elements/1.1/> <> dc:title \"#{nodename}-root\""
+    target_url = "#{self.fedora_rest_url}/#{nodename}"
     
     # Create the node with a put call
     resp = Typhoeus.put(target_url, headers: heads, body: bodyrdf)
 
-    logger.info "Add node [#{nname}] response: #{resp.response_code}."
+    logger.info "Add node [#{nodename}] response: #{resp.response_code}."
   end
 
   # Delete fedora node
   def del_node
     # Delete the node
     heads = { 'Content-Type' => "text/plain" }
-    nname ="#{nodename}" 
-    target_url = "#{self.fedora_rest_url}/#{ENV["USER"]}/#{nname}"
+    target_url = "#{self.fedora_rest_url}/#{nodename}"
     
     resp = Typhoeus.delete(target_url, headers: heads)
 
     # 204 for success 404 for already deleted
-    logger.info "Delete node [#{nname}] response code: #{resp.response_code}. "
+    logger.info "Delete node [#{nodename}] response code: #{resp.response_code}. "
 
     # Delete tombstone
-    target_url = "#{self.fedora_rest_url}/#{ENV["USER"]}/#{nname}/fcr:tombstone"
+    target_url = "#{self.fedora_rest_url}/#{nodename}/fcr:tombstone"
     resp = Typhoeus.delete(target_url, headers: heads)
 
     # 204 for success. 404 for already deleted.
-    logger.info "Delete tombstone for [#{nname}] response code: #{resp.response_code}. "
+    logger.info "Delete tombstone for [#{nodename}] response code: #{resp.response_code}. "
   end
 
   # Check if fedora node exists
   def node_exists?
     heads = { 'Content-Type' => "text/plain" }
-    nname ="#{ENV["USER"]}-#{nodename}" 
-    target_url = "#{self.fedora_rest_url}/#{ENV["USER"]}/#{nname}"
+    target_url = "#{self.fedora_rest_url}/#{nodename}"
     
     resp = Typhoeus.get(target_url, headers: heads)
 
@@ -377,7 +392,7 @@ class UMichwrapper
 
   def node_childs()
     heads = { 'Accept' => "application/ld+json" }
-    target_url = "#{self.fedora_rest_url}/#{ENV["USER"]}"
+    target_url = self.fedora_rest_url
     
     resp = Typhoeus.get(target_url, headers: heads)
     
