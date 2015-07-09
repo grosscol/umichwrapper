@@ -114,11 +114,11 @@ class UMichwrapper
       sum_config = parse_config_file( default_file )
 
       # Read additional possible configs from app config
-      app_config    = parse_config_file(app_file)    
-      solr_config   = parse_config_file(solr_file)   
-      fedora_config = parse_config_file(fedora_file) 
+      app_config    = parse_config_file(app_file)
+      solr_config   = parse_config_file(solr_file)
+      fedora_config = parse_config_file(fedora_file)
 
-      merge_logic = Proc.new do |key,old,new|  
+      merge_logic = Proc.new do |key,old,new|
         if old.is_a?(Hash) && new.is_a?(Hash)
           old.merge new
         else
@@ -127,7 +127,7 @@ class UMichwrapper
       end
 
       # Merge default and app umich configs
-      #  overwritting with app_config where applicable 
+      #  overwritting with app_config where applicable
       sum_config.merge! app_config, &merge_logic
 
       # Add fedora and solr configs from matching config_name
@@ -163,12 +163,12 @@ class UMichwrapper
 
       # Params Required for Fedora
       tupac.fedora_url       = params[:fedora_cfg][:url] || params[:fedora_url] || "localhost:8080/tomcat/quod-dev/fedora/rest"
-      tupac.fedora_rest_url  = "#{tupac.fedora_url}" 
+      tupac.fedora_rest_url  = "#{tupac.fedora_url}"
 
       # Params without required defaults.
       tupac.solr_core_name   = params[:solr_core_name]
       tupac.fedora_node_path = params[:fedora_cfg][:base_path] || params[:fedora_node_path]
-      
+
       return tupac
     end
 
@@ -229,12 +229,12 @@ class UMichwrapper
 
   def core_status
     vars = {
-      action: "STATUS", 
+      action: "STATUS",
       wt: "json"}
 
     target_url = "#{self.solr_admin_url}/cores"
     resp = Typhoeus.get(target_url, params: vars)
-    
+
     if resp.response_code == 200
       body = JSON.parse!(resp.response_body)
       # Array of two elements [name string, info hash]
@@ -270,8 +270,8 @@ class UMichwrapper
     FileUtils.rm_rf( core_inst_dir )
   end
 
-  def corename
-    name = self.solr_core_name || "#{ENV['USER']}-#{env_name(UMichwrapper.env)}"
+  def corename(prefixed=true)
+    name = self.solr_core_name || "#{prefixed ? ENV['USER'] + '-' : ''}#{env_name(UMichwrapper.env)}"
   end
 
   def nodename
@@ -312,11 +312,11 @@ class UMichwrapper
     else
       logger.info "Using default solr_cores template."
       # Make sure src directory ends with trailing file separator so cp_r operates as expected
-      src  = File.join( File.expand_path("../../solr_cores", __FILE__), corename, '' )
+      src  = File.join( File.expand_path("../../solr_cores", __FILE__), corename(false), '' )
     end
-    
+
     # Create core_inst_dir directory parent on the file system.
-    core_inst_dir_parent = File.expand_path("..", core_inst_dir) 
+    core_inst_dir_parent = File.expand_path("..", core_inst_dir)
     FileUtils.mkdir_p( core_inst_dir_parent )
 
     # Copy contents of template source to core instance directory
@@ -354,7 +354,7 @@ class UMichwrapper
     heads = { 'Content-Type' => "text/turtle" }
     bodyrdf = "PREFIX dc: <http://purl.org/dc/elements/1.1/> <> dc:title \"#{nodename}-root\""
     target_url = "#{self.fedora_rest_url}/#{nodename}"
-    
+
     # Create the node with a put call
     resp = Typhoeus.put(target_url, headers: heads, body: bodyrdf)
 
@@ -366,7 +366,7 @@ class UMichwrapper
     # Delete the node
     heads = { 'Content-Type' => "text/plain" }
     target_url = "#{self.fedora_rest_url}/#{nodename}"
-    
+
     resp = Typhoeus.delete(target_url, headers: heads)
 
     # 204 for success 404 for already deleted
@@ -384,7 +384,7 @@ class UMichwrapper
   def node_exists?
     heads = { 'Content-Type' => "text/plain" }
     target_url = "#{self.fedora_rest_url}/#{nodename}"
-    
+
     resp = Typhoeus.get(target_url, headers: heads)
 
     return resp.response_code == 200
@@ -393,9 +393,9 @@ class UMichwrapper
   def node_childs()
     heads = { 'Accept' => "application/ld+json" }
     target_url = self.fedora_rest_url
-    
+
     resp = Typhoeus.get(target_url, headers: heads)
-    
+
     # Return an empty array if request was not successful.
     if resp.response_code != 200
       logger.error("Node child query url: #{target_url}")
@@ -404,7 +404,7 @@ class UMichwrapper
     end
 
     # Parse the body of the response for ldp#contains, or return an empty array
-    body = JSON.parse! resp.response_body 
+    body = JSON.parse! resp.response_body
     return body[1]["http://www.w3.org/ns/ldp#contains"] || []
   end
 
