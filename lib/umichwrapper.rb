@@ -312,7 +312,7 @@ class UMichwrapper
     else
       logger.info "Using default solr_cores template."
       # Make sure src directory ends with trailing file separator so cp_r operates as expected
-      src  = File.join( File.expand_path("../../solr_cores", __FILE__), corename, '' )
+      src  = File.join( File.expand_path("../../solr_cores", __FILE__), env_name(UMichwrapper.env), '' )
     end
     
     # Create core_inst_dir directory parent on the file system.
@@ -320,9 +320,9 @@ class UMichwrapper
     FileUtils.mkdir_p( core_inst_dir_parent )
 
     # Copy contents of template source to core instance directory
-    FileUtils.cp_r(src, core_inst_dir, remove_destination: true)
     logger.info "Core template: #{src}"
     logger.info "Core instance: #{core_inst_dir}"
+    FileUtils.cp_r(src, core_inst_dir, remove_destination: true)
 
     # API call to register new core with Solr instance.
     # Sometimes core discovery is flakey, so ignore an error response here.
