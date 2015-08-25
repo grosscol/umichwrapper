@@ -13,7 +13,9 @@
   <!-- solr lib dirs -->
   <lib dir="../../lib/contrib/analysis-extras/lib" />
   <lib dir="../../lib/contrib/analysis-extras/lucene-libs" />
-  
+  <!-- for full-text indexing -->
+  <lib dir="../../lib/contrib/extraction/lib" regex=".*\.jar" />
+
   <dataDir>${solr.data.dir:}</dataDir>
 
   <updateHandler class="solr.DirectUpdateHandler2">
@@ -122,6 +124,20 @@
     </lst>
   </requestHandler>
   
+  <!-- requestHandler for full text extraction -->
+  <requestHandler name="/update/extract" startup="lazy" class="org.apache.solr.handler.extraction.ExtractingRequestHandler" >
+    <lst name="defaults">
+      <!-- All the main content goes into "text"... if you need to return the extracted text or do highlighting, use a stored field. -->
+      <str name="fmap.content">text</str>
+      <str name="lowernames">true</str>
+      <str name="uprefix">ignored_</str>
+      <!-- capture link hrefs but ignore div attributes -->
+      <str name="captureAttr">true</str>
+      <str name="fmap.a">links</str>
+      <str name="fmap.div">ignored_</str>
+    </lst>
+  </requestHandler>
+
   <requestHandler name="standard" class="solr.SearchHandler">
      <lst name="defaults">
        <str name="echoParams">explicit</str>
