@@ -8,7 +8,6 @@ require 'logger'
 require 'typhoeus'
 require 'active_support/core_ext/hash'
 
-
 Dir[File.expand_path(File.join(File.dirname(__FILE__),"tasks/*.rake"))].each { |ext| load ext } if defined?(Rake)
 
 
@@ -137,6 +136,8 @@ class UMichwrapper
       # Add the indifferent access magic from ActiveSupport.
       config = sum_config.with_indifferent_access
       config[config_name] || config['default'.freeze]
+
+
     end
 
 
@@ -162,12 +163,20 @@ class UMichwrapper
       tupac.solr_home        = params[:solr_home] || "/quod-dev/idx/h/hydra-solr"
 
       # Params Required for Fedora
-      tupac.fedora_url       = params[:fedora_cfg][:url] || params[:fedora_url] || "localhost:8080/tomcat/quod-dev/fedora/rest"
+      if params[:fedora_cfg]
+        tupac.fedora_url = params[:fedora_cfg][:url]
+      else
+        tupac.fedora_url = params[:fedora_url] || "localhost:8080/tomcat/quod-dev/fedora/rest"
+      end
       tupac.fedora_rest_url  = "#{tupac.fedora_url}" 
 
       # Params without required defaults.
       tupac.solr_core_name   = params[:solr_core_name]
-      tupac.fedora_node_path = params[:fedora_cfg][:base_path] || params[:fedora_node_path]
+      if params[:fedora_cfg]
+        tupac.fedora_node_path = params[:fedora_cfg][:base_path] || params[:fedora_node_path]
+      else
+        tupac.fedora_node_path = params[:fedora_node_path]
+      end
       
       return tupac
     end
