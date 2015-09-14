@@ -1,7 +1,7 @@
 development:
   solr_home:      /quod-dev/idx/h/hydra-solr
   solr_admin_url: localhost:8080/tomcat/quod-dev/solr-hydra/admin
-  fedora_url:     localhost:8080/fedora
+  fedora_url:     localhost:8080/fedora/rest
 
 testing:
   solr_admin_url: localhost:8080/tomcat/quod-dev/solr-hydra/admin

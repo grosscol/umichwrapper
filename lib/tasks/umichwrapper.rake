@@ -1,4 +1,5 @@
 require 'yaml'
+require_relative '../umichwrapper' unless defined?(UMichwrapper)
 
 ## These tasks get loaded into the host application when umichwrapper is required
 namespace :umich do
