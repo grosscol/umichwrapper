@@ -280,7 +280,11 @@ class UMichwrapper
     core_inst_dir = File.join( self.solr_home, ENV['USER'], corename )
     logger.info "Deleting dir: #{core_inst_dir}"
 
-    FileUtils.rm_r( core_inst_dir )
+    begin
+      FileUtils.rm_r( core_inst_dir )
+    rescue Errno::ENOENT => my_ex
+      logger.info "#{core_inst_dir} does not exist.  Core already cleaned?"
+    end
   end
 
   # Manually do update with commit=true to force solr to clear the tlogs
@@ -295,7 +299,7 @@ class UMichwrapper
     target_url = "#{self.solr_base_url}/#{corename}/update"
     resp = Typhoeus.get(target_url, params: vars)
     if resp.response_code == 404
-      logger.info "#{target_url} not found.  Already cleaned?"
+      logger.info "#{target_url} not found.  Core already cleaned?"
     else
       body = JSON.parse!(resp.response_body)
     end
