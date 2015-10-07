@@ -225,7 +225,6 @@ class UMichwrapper
       sleep 2 # wait for tlogs to be committed
       UMichwrapper.instance.del_core
       UMichwrapper.instance.del_node
-      UMichwrapper.instance.del_core
       return UMichwrapper.instance
     end
 
@@ -292,9 +291,14 @@ class UMichwrapper
       commit: true,
       wt: "json"}
 
+    logger.info "Commiting solr tlogs."
     target_url = "#{self.solr_base_url}/#{corename}/update"
     resp = Typhoeus.get(target_url, params: vars)
-    body = JSON.parse!(resp.response_body)
+    if resp.response_code == 404
+      logger.info "#{target_url} not found.  Already cleaned?"
+    else
+      body = JSON.parse!(resp.response_body)
+    end
   end
 
   def commit_pending_tlogs
