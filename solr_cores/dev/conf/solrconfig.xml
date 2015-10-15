@@ -24,13 +24,16 @@
       <str name="dir">${solr.ulog.dir:}</str>
     </updateLog>
 
+    <maxPendingDeletes>10</maxPendingDeletes>
+
     <autoCommit> 
-      <maxTime>${solr.autoCommit.maxTime:15000}</maxTime> 
+      <maxTime>${solr.autoCommit.maxTime:5000}</maxTime> 
+      <maxDocs>${solr.autoCommit.maxTime:5}</maxDocs> 
       <openSearcher>false</openSearcher> 
     </autoCommit>
 
     <autoSoftCommit> 
-      <maxTime>${solr.autoSoftCommit.maxTime:-1}</maxTime> 
+      <maxTime>${solr.autoSoftCommit.maxTime:2500}</maxTime> 
     </autoSoftCommit>
 
   </updateHandler>

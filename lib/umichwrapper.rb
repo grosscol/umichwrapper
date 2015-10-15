@@ -16,7 +16,7 @@ class UMichwrapper
 
   include Singleton
 
-  attr_accessor :solr_admin_url, :fedora_url, :fedora_rest_url
+  attr_accessor :solr_base_url, :solr_admin_url, :fedora_url, :fedora_rest_url
   attr_accessor :solr_core_name, :fedora_node_path
   attr_accessor :solr_home # Home directory for solr. Cores get added here.
   attr_accessor :base_path # Base path of the application.
@@ -160,6 +160,7 @@ class UMichwrapper
 
       # Params Required for Solr
       tupac.solr_admin_url   = params[:solr_admin_url] || "localhost:8080/tomcat/quod-dev/solr-hydra/admin"
+      tupac.solr_base_url   = params[:solr_base_url] || "localhost:8080/tomcat/quod-dev/solr-hydra"
       tupac.solr_home        = params[:solr_home] || "/quod-dev/idx/h/hydra-solr"
 
       # Params Required for Fedora
@@ -219,6 +220,9 @@ class UMichwrapper
 
     def clean(params)
       UMichwrapper.configure(params)
+      UMichwrapper.instance.del_node
+      UMichwrapper.instance.commit_solr_tlogs
+      sleep 2 # wait for tlogs to be committed
       UMichwrapper.instance.del_core
       UMichwrapper.instance.del_node
       return UMichwrapper.instance
@@ -276,7 +280,45 @@ class UMichwrapper
     core_inst_dir = File.join( self.solr_home, ENV['USER'], corename )
     logger.info "Deleting dir: #{core_inst_dir}"
 
-    FileUtils.rm_rf( core_inst_dir )
+    begin
+      FileUtils.rm_r( core_inst_dir )
+    rescue Errno::ENOENT => my_ex
+      logger.info "#{core_inst_dir} does not exist.  Core already cleaned?"
+    end
+  end
+
+  # Manually do update with commit=true to force solr to clear the tlogs
+  # so that the solr directory can be deleted.
+  def commit_solr_tlogs
+    # API call to commit transaction logs for solr core.
+    vars = {
+      commit: true,
+      wt: "json"}
+
+    logger.info "Commiting solr tlogs."
+    target_url = "#{self.solr_base_url}/#{corename}/update"
+    resp = Typhoeus.get(target_url, params: vars)
+    if resp.response_code == 404
+      logger.info "#{target_url} not found.  Core already cleaned?"
+    else
+      body = JSON.parse!(resp.response_body)
+    end
+  end
+
+  def commit_pending_tlogs
+    # API call to unload core with Solr instance.
+    vars = {
+      action: "UPDATE",
+      commit: true,
+      wt: "json"}
+
+    target_url = "#{self.solr_admin_url}/#{corename}"
+    resp = Typhoeus.get(target_url, params: vars)
+
+    body = JSON.parse!(resp.response_body)
+
+    binding.pry
+
   end
 
   def corename
@@ -303,15 +345,21 @@ class UMichwrapper
     core_inst_dir = File.join( self.solr_home, ENV['USER'], corename )
 
     logger.debug "Adding solr core #{corename}"
-    # Check if core instance directory already exists
-    cs = core_status
-    instance_dirs =  cs.collect{ |arr| arr[1]["instanceDir"].chop }
+    # Check if core instance already exists according to solr
+    instance_dirs =  core_status.collect{ |arr| arr[1]["instanceDir"].chop }
 
-    # Short circut if core instance directory already exists.
-    if instance_dirs.include? core_inst_dir
-      logger.info "Directory for #{corename} alerady exists."
+    # Check filesystem for instance directory.
+    if File.exist? core_inst_dir
+      logger.warn "Directory #{corename} alerady exists. Core not added."
       return
     end
+    
+    # Check Solr for core.
+    if instance_dirs.include? core_inst_dir
+      logger.warn "Solr core for #{corename} alerady exists. Core not added."
+      return
+    end
+
 
     # File operation to copy dir and files from template
     # Check for solr_cores/corename template in current directory
