@@ -345,15 +345,21 @@ class UMichwrapper
     core_inst_dir = File.join( self.solr_home, ENV['USER'], corename )
 
     logger.debug "Adding solr core #{corename}"
-    # Check if core instance directory already exists
-    cs = core_status
-    instance_dirs =  cs.collect{ |arr| arr[1]["instanceDir"].chop }
+    # Check if core instance already exists according to solr
+    instance_dirs =  core_status.collect{ |arr| arr[1]["instanceDir"].chop }
 
-    # Short circut if core instance directory already exists.
-    if instance_dirs.include? core_inst_dir
-      logger.info "Directory for #{corename} alerady exists."
+    # Check filesystem for instance directory.
+    if File.exist? core_inst_dir
+      logger.warn "Directory #{corename} alerady exists. Core not added."
       return
     end
+    
+    # Check Solr for core.
+    if instance_dirs.include? core_inst_dir
+      logger.warn "Solr core for #{corename} alerady exists. Core not added."
+      return
+    end
+
 
     # File operation to copy dir and files from template
     # Check for solr_cores/corename template in current directory
