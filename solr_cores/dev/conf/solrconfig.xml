@@ -171,6 +171,8 @@
     </lst>
   </searchComponent>
 
+  <searchComponent name="termsComponent" class="solr.TermsComponent" />
+
   <requestHandler name="/terms" class="solr.SearchHandler">
     <lst name="defaults">
       <bool name="terms">true</bool>
