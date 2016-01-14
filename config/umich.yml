@@ -1,8 +1,8 @@
 development:
-  solr_home:      /quod-dev/idx/h/hydra-solr
-  solr_admin_url: localhost:8080/tomcat/quod-dev/solr-hydra/admin
-  fedora_url:     localhost:8080/fedora/rest
+  solr_home:        <%= ENV['SOLR_HOME']      || "/quod-dev/idx/h/hydra-solr" %>
+  solr_admin_url:   <%= ENV['SOLR_ADMIN_URL'] || "http://localhost:8080/tomcat/quod-dev/solr-hydra/admin" %>
+  fedora_url:       localhost:8080/fedora/rest
 
 testing:
-  solr_admin_url: localhost:8080/tomcat/quod-dev/solr-hydra/admin
-  fedora_url:     localhost:8080/fedora/rest
+  solr_admin_url:   <%= ENV['SOLR_ADMIN_URL'] || "http://localhost:8080/tomcat/quod-dev/solr-hydra/admin" %>
+  fedora_url:       localhost:8080/fedora/rest

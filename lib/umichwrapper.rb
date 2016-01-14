@@ -17,8 +17,8 @@ class UMichwrapper
   include Singleton
 
   attr_accessor :solr_base_url, :solr_admin_url, :fedora_url, :fedora_rest_url
-  attr_accessor :solr_core_name, :fedora_node_path
-  attr_accessor :solr_home # Home directory for solr. Cores get added here.
+  attr_accessor :solr_core_parent, :solr_core_name, :fedora_node_path
+  attr_accessor :solr_home # Home directory for solr. Cores parent directory added here.
   attr_accessor :base_path # Base path of the application.
 
   # configure the singleton with some defaults
@@ -173,6 +173,7 @@ class UMichwrapper
 
       # Params without required defaults.
       tupac.solr_core_name   = params[:solr_core_name]
+      tupac.solr_core_parent = params[:solr_core_parent] || ENV['USER']
       if params[:fedora_cfg]
         tupac.fedora_node_path = params[:fedora_cfg][:base_path] || params[:fedora_node_path]
       else
@@ -224,7 +225,6 @@ class UMichwrapper
       UMichwrapper.instance.commit_solr_tlogs
       sleep 2 # wait for tlogs to be committed
       UMichwrapper.instance.del_core
-      UMichwrapper.instance.del_node
       return UMichwrapper.instance
     end
 
@@ -239,6 +239,18 @@ class UMichwrapper
     end
 
   end #end of class << self
+
+  def corename
+    name = self.solr_core_name || "#{ENV['USER']}-#{env_name(UMichwrapper.env)}"
+  end
+
+  def nodename
+    name = self.fedora_node_path || "#{ENV['USER']}-#{env_name(UMichwrapper.env)}"
+  end
+
+  def core_inst_dir 
+    File.join( self.solr_home, self.solr_core_parent, corename )
+  end
 
   def core_status
     vars = {
@@ -277,7 +289,6 @@ class UMichwrapper
     end
 
     # Remove core directory from file system
-    core_inst_dir = File.join( self.solr_home, ENV['USER'], corename )
     logger.info "Deleting dir: #{core_inst_dir}"
 
     begin
@@ -321,14 +332,6 @@ class UMichwrapper
 
   end
 
-  def corename
-    name = self.solr_core_name || "#{ENV['USER']}-#{env_name(UMichwrapper.env)}"
-  end
-
-  def nodename
-    name = self.fedora_node_path || "#{ENV['USER']}-#{env_name(UMichwrapper.env)}"
-  end
-
   def env_name( env )
     case env
     when /^dev(elopment)?/i
@@ -341,9 +344,6 @@ class UMichwrapper
   end
 
   def add_core
-    # Get core instance dir for user/project
-    core_inst_dir = File.join( self.solr_home, ENV['USER'], corename )
-
     logger.debug "Adding solr core #{corename}"
     # Check if core instance already exists according to solr
     instance_dirs =  core_status.collect{ |arr| arr[1]["instanceDir"].chop }
@@ -359,7 +359,6 @@ class UMichwrapper
       logger.warn "Solr core for #{corename} alerady exists. Core not added."
       return
     end
-
 
     # File operation to copy dir and files from template
     # Check for solr_cores/corename template in current directory
