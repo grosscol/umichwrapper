@@ -327,9 +327,6 @@ class UMichwrapper
     resp = Typhoeus.get(target_url, params: vars)
 
     body = JSON.parse!(resp.response_body)
-
-    binding.pry
-
   end
 
   def env_name( env )
