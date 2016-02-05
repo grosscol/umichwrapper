@@ -335,6 +335,8 @@ class UMichwrapper
       "dev"
     when /^test(ing)?/i
       "test"
+    when /^prod(uction)?/i
+      "production"
     else
       'default'
     end
