@@ -349,8 +349,7 @@ class UMichwrapper
 
     # Check filesystem for instance directory.
     if File.exist? core_inst_dir
-      logger.warn "Directory #{corename} alerady exists. Core not added."
-      return
+      logger.warn "Directory #{corename} alerady exists."
     end
     
     # Check Solr for core.
